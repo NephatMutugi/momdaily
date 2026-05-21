@@ -15,6 +15,8 @@ import HabitChecklist, {
 } from "@/components/HabitChecklist";
 import StreakBadge from "@/components/StreakBadge";
 import LoggedToast from "@/components/LoggedToast";
+import ForYouRail from "@/components/ForYouRail";
+import type { TipListItemData } from "@/components/TipListItem";
 
 export interface DashboardProps {
   greetingName: string;
@@ -23,6 +25,8 @@ export interface DashboardProps {
   tip: TipCardData | null;
   habits: HabitItem[];
   streak: StreakSnapshot;
+  forYouTips: TipListItemData[];
+  savedTipIds: string[];
 }
 
 export default function DashboardClient({
@@ -32,12 +36,14 @@ export default function DashboardClient({
   tip,
   habits,
   streak: initialStreak,
+  forYouTips,
+  savedTipIds,
 }: DashboardProps) {
   const [streak, setStreak] = useState<StreakSnapshot>(initialStreak);
+  const savedSet = new Set(savedTipIds);
 
   return (
     <main className="mx-auto max-w-md p-6 pb-32 space-y-6">
-      {/* useSearchParams() requires Suspense in app router. */}
       <Suspense fallback={null}>
         <LoggedToast />
       </Suspense>
@@ -66,6 +72,12 @@ export default function DashboardClient({
       )}
 
       <HabitChecklist habits={habits} onStreakChange={setStreak} />
+
+      <ForYouRail
+        tips={forYouTips}
+        savedTipIds={savedSet}
+        childName={childName}
+      />
     </main>
   );
 }

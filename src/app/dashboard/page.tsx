@@ -9,6 +9,7 @@ import {
   addDaysUTC,
 } from "@/lib/streak";
 import { ensureDefaultHabits } from "@/lib/defaultHabits";
+import { getForYouTips, listSavedTipIds } from "@/lib/tipBrowse";
 import DashboardClient from "./DashboardClient";
 
 /**
@@ -98,6 +99,15 @@ export default async function DashboardPage() {
 
   const child = user.children[0];
 
+  // "For you" rail — additional tips beyond today's, scored by goal + age.
+  const [forYouTips, savedIds] = await Promise.all([
+    getForYouTips(session.user.id, {
+      limit: 4,
+      excludeTipIds: tipResult ? [tipResult.tip.id] : [],
+    }),
+    listSavedTipIds(session.user.id),
+  ]);
+
   return (
     <DashboardClient
       greetingName={user.name ?? "there"}
@@ -121,6 +131,16 @@ export default async function DashboardPage() {
         loggedToday: (h.logs[0]?.value ?? false) === true,
       }))}
       streak={streak}
+      forYouTips={forYouTips.map((t) => ({
+        id: t.id,
+        slug: t.slug,
+        title: t.title,
+        body: t.body,
+        category: t.category,
+        ageMinMonths: t.ageMinMonths,
+        ageMaxMonths: t.ageMaxMonths,
+      }))}
+      savedTipIds={Array.from(savedIds)}
     />
   );
 }

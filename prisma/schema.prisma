@@ -106,6 +106,7 @@ model User {
   children         Child[]
   tipsShown        TipShown[]
   tipFeedback      TipFeedback[]
+  tipSaves         TipSave[]
   habits           Habit[]
   habitLogs        HabitLog[]
   emailPreference  EmailPreference?
@@ -146,10 +147,27 @@ model Tip {
 
   shownTo   TipShown[]
   feedbacks TipFeedback[]
+  saves     TipSave[]
 
   @@index([publishedAt])
   @@index([category])
   @@index([ageMinMonths, ageMaxMonths])
+}
+
+// User-bookmarked tips. Distinct from TipFeedback (thumbs up/down) and
+// TipShown (recency tracking) because "I want to remember this" is its
+// own user intent. One row per (user, tip); toggling un-bookmarks.
+model TipSave {
+  id        String   @id @default(cuid())
+  userId    String
+  tipId     String
+  savedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tip  Tip  @relation(fields: [tipId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tipId])
+  @@index([userId, savedAt])
 }
 
 model TipShown {
