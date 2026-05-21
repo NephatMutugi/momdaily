@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Theme tokens. Two modes share the same shape — light is the :root default,
+ * dark is applied via data-theme="dark" on <html>. A media query also flips to
+ * dark when the user has no explicit preference and the OS is set to dark.
+ *
+ * Accent: warm rose — softer than the gym-planner blue, intentionally chosen
+ * to feel calming for sleep-deprived users.
+ */
+:root {
+  --bg: #fffaf7;
+  --bg-elev: #fff3ed;
+  --border: #f0d7ca;
+  --fg: #2a1f1a;
+  --fg-muted: #7a6a62;
+  --accent: #c2410c;          /* orange-700, warm but readable */
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(194, 65, 12, 0.12);
+  --danger: #b91c1c;
+  --input-bg: #ffffff;
+  --shadow-elev: 0 1px 2px rgba(42, 31, 26, 0.05);
+}
+
+[data-theme="dark"] {
+  --bg: #1a1410;
+  --bg-elev: #241b16;
+  --border: #3a2c24;
+  --fg: #f5ede7;
+  --fg-muted: #b3a097;
+  --accent: #fb923c;          /* orange-400 — pops on dark */
+  --accent-fg: #1a1410;
+  --accent-soft: rgba(251, 146, 60, 0.18);
+  --danger: #f87171;
+  --input-bg: #1f1812;
+  --shadow-elev: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1410;
+    --bg-elev: #241b16;
+    --border: #3a2c24;
+    --fg: #f5ede7;
+    --fg-muted: #b3a097;
+    --accent: #fb923c;
+    --accent-fg: #1a1410;
+    --accent-soft: rgba(251, 146, 60, 0.18);
+    --danger: #f87171;
+    --input-bg: #1f1812;
+    --shadow-elev: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+select,
+textarea {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  width: 100%;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+button {
+  cursor: pointer;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  width: 100%;
+  transition: opacity 0.15s ease, transform 0.05s ease;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btn-ghost {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--fg);
+}
+
+.card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+/* Reserve space for the bottom nav on mobile when it's rendered. */
+@media (max-width: 767px) {
+  body:has(nav[aria-label="Primary"]) main {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+}
