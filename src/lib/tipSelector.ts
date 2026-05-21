@@ -110,19 +110,27 @@ export function hashString(s: string): number {
  * Behavior:
  *   - No candidates → null
  *   - One candidate → that one
- *   - Multiple → score all, take the top N (where N=3 by default), then
- *     deterministically pick one using hash(todayKey). This gives the user
- *     "today's tip" stability while still varying day-to-day.
+ *   - Multiple → score all, then build a "near-tie pool": tips whose score
+ *     is within `tieEpsilon` of the leader (capped at `topN`). Deterministic
+ *     pick from that pool using hash(todayKey).
+ *
+ * Why score-proximity and not raw top-N:
+ *   Day-to-day variety is already provided by the 30-day no-repeats filter
+ *   upstream. The pool here exists to break near-ties — not to let a clear
+ *   loser win on certain days. With `tieEpsilon = 1.5`, a tip without a
+ *   matching goal (≥4 points behind a goal-matched tip) is never in the
+ *   variability pool when a goal-matched alternative exists.
  */
 export function pickTip<T extends TipCandidate>(
   input: SelectorInput<T>,
-  options?: { topN?: number }
+  options?: { topN?: number; tieEpsilon?: number }
 ): T | null {
   const { candidates, ageMonths, topGoal, todayKey } = input;
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0]!;
 
   const topN = options?.topN ?? 3;
+  const tieEpsilon = options?.tieEpsilon ?? 1.5;
 
   const scored = candidates.map((tip) => ({
     tip,
@@ -136,7 +144,12 @@ export function pickTip<T extends TipCandidate>(
     return a.tip.slug.localeCompare(b.tip.slug);
   });
 
-  const pool = scored.slice(0, Math.min(topN, scored.length));
+  // Variability pool = leader plus anything within tieEpsilon of it, capped
+  // at topN. A clear winner ends up alone in the pool and always wins.
+  const leaderScore = scored[0]!.score;
+  const nearTies = scored.filter((s) => s.score >= leaderScore - tieEpsilon);
+  const pool = nearTies.slice(0, Math.min(topN, nearTies.length));
+
   const index = hashString(todayKey) % pool.length;
   return pool[index]!.tip;
 }

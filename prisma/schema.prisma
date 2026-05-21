@@ -1,8 +1,9 @@
-// MomDaily schema — Phase 2.
+// MomDaily schema — Phase 4.
 // Postgres (Vercel Postgres, Neon-backed).
 //
-// Phase 2 adds: TipCategory enum, Tip, TipShown (no-repeat tracking),
-// TipFeedback. Phase 3 adds Habit/HabitLog. Phase 4 adds EmailPreference.
+// Phase 4 adds: EmailPreference (per-user opt-ins + send hour) and
+// EmailSendLog (idempotency: one row per user/kind/day prevents the cron
+// from double-sending if it retries or runs concurrently).
 
 generator client {
   provider = "prisma-client-js"
@@ -37,6 +38,12 @@ enum TipCategory {
   milestones
   self_care
   safety
+}
+
+enum EmailKind {
+  morning
+  evening
+  weekly_recap
 }
 
 // --- NextAuth required tables ---
@@ -94,11 +101,15 @@ model User {
   topGoal   Goal?
   onboarded Boolean @default(false)
 
-  accounts     Account[]
-  sessions     Session[]
-  children     Child[]
-  tipsShown    TipShown[]
-  tipFeedback  TipFeedback[]
+  accounts         Account[]
+  sessions         Session[]
+  children         Child[]
+  tipsShown        TipShown[]
+  tipFeedback      TipFeedback[]
+  habits           Habit[]
+  habitLogs        HabitLog[]
+  emailPreference  EmailPreference?
+  emailSendLogs    EmailSendLog[]
 }
 
 model Child {
@@ -121,20 +132,14 @@ model Tip {
   id              String      @id @default(cuid())
   slug            String      @unique
   title           String
-  // Markdown. Kept short — Phase 5 will render this on a public tip page.
   body            String
   category        TipCategory
-  // Inclusive age band, in months.
   ageMinMonths    Int
   ageMaxMonths    Int
-  // Which user goals this tip "hits" — used by the selector for goal weighting.
   goalsHit        Goal[]
-  // Aggregate signal — incremented by TipFeedback writes. Read-mostly.
   helpfulCount    Int         @default(0)
   notHelpfulCount Int         @default(0)
-  // Free-form citation strings (URLs or "AAP, 2024"). Rendered on tip page.
   sources         String[]
-  // null = draft. Selector and public pages only consider published tips.
   publishedAt     DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -147,9 +152,6 @@ model Tip {
   @@index([ageMinMonths, ageMaxMonths])
 }
 
-// Records each tip ever shown to a user. The selector queries this to
-// enforce the "no repeats inside 30 days" rule. We update shownAt on every
-// (re)show, so a single row per (user, tip) is enough.
 model TipShown {
   id      String   @id @default(cuid())
   userId  String
@@ -173,7 +175,85 @@ model TipFeedback {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   tip  Tip  @relation(fields: [tipId], references: [id], onDelete: Cascade)
 
-  // One vote per user per tip — re-submitting overwrites.
   @@unique([userId, tipId])
   @@index([tipId])
+}
+
+// --- Habits (Phase 3) ---
+
+model Habit {
+  id        String   @id @default(cuid())
+  userId    String
+  // Stable identifier independent of label. Used for default-habit seeding
+  // and to keep historical logs intact when the user renames a habit.
+  key       String
+  label     String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs HabitLog[]
+
+  @@unique([userId, key])
+  @@index([userId, active])
+}
+
+model HabitLog {
+  id      String @id @default(cuid())
+  userId  String
+  habitId String
+  // Stored as a date-only column. The API computes "today" in the user's
+  // timezone and converts to a UTC-midnight Date before write.
+  loggedDate DateTime @db.Date
+  value      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  // One row per habit per day. Re-toggling updates `value` instead of stacking.
+  @@unique([userId, habitId, loggedDate])
+  @@index([userId, loggedDate])
+}
+
+// --- Email (Phase 4) ---
+
+// One row per user. Created lazily on first need (onboarding completion or
+// the first cron pass). Send time is stored in the user's local clock — the
+// cron resolves it against User.timezone at send time.
+model EmailPreference {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  morningEnabled  Boolean @default(true)
+  eveningEnabled  Boolean @default(false)
+  weeklyEnabled   Boolean @default(true)
+  // Hour 0–23 in the user's local timezone. Default 7am.
+  sendHourLocal   Int     @default(7)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Idempotency guard for the cron. Before sending, the cron upserts a row
+// here keyed by (userId, kind, sentDate). If the row already existed, the
+// cron skips the send — so a retry, concurrent invocation, or accidental
+// re-trigger can't double-mail anyone.
+model EmailSendLog {
+  id        String    @id @default(cuid())
+  userId    String
+  kind      EmailKind
+  // The user's local date the email was sent for, normalized to UTC midnight.
+  sentDate  DateTime  @db.Date
+  // Resend's message id, captured for debugging deliverability issues.
+  providerMessageId String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, sentDate])
+  @@index([userId, kind])
 }

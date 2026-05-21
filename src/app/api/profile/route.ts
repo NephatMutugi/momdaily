@@ -4,9 +4,11 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { consume, PROFILE_LIMIT } from "@/lib/rate-limit";
+import { DEFAULT_HABITS } from "@/lib/defaultHabits";
 
-// One endpoint handles onboarding completion: name + child + goal in a single
-// transaction. Keeping it atomic prevents "half-onboarded" zombie states.
+// One endpoint handles onboarding completion: name + child + goal + default
+// habits in a single transaction. Keeping it atomic prevents "half-onboarded"
+// zombie states where a user has a child profile but no habits, or vice versa.
 
 const FeedingStage = z.enum(["breast", "formula", "mixed", "solids", "family_foods"]);
 const Goal = z.enum(["sleep", "feeding", "milestones", "self_care"]);
@@ -88,6 +90,27 @@ export async function POST(req: NextRequest) {
           feedingStage: child.feedingStage,
           gender: child.gender ?? null,
         },
+      });
+      // Seed the three default habits. Idempotent — re-onboarding a user
+      // (which the UI doesn't currently allow) wouldn't duplicate them.
+      for (const h of DEFAULT_HABITS) {
+        await tx.habit.upsert({
+          where: { userId_key: { userId: session.user.id, key: h.key } },
+          create: {
+            userId: session.user.id,
+            key: h.key,
+            label: h.label,
+            sortOrder: h.sortOrder,
+          },
+          update: {},
+        });
+      }
+      // Seed default email preferences. Morning ON, evening OFF, weekly ON.
+      // sendHourLocal defaults to 7am; user can change later in /account.
+      await tx.emailPreference.upsert({
+        where: { userId: session.user.id },
+        create: { userId: session.user.id },
+        update: {},
       });
     });
     return NextResponse.json({ ok: true }, { status: 200 });

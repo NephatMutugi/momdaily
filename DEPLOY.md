@@ -39,26 +39,56 @@ Once the schema settles (later phases), switch to `prisma migrate deploy` in the
 - Deploy should be green.
 - Open the deploy URL → placeholder home loads.
 
-## Env var checklist (Phase 0)
+## Env var checklist
 
-| Variable | Required | Source |
+| Variable | Required by | Source |
 |---|---|---|
-| `DATABASE_URL` | ✅ | Vercel Postgres dashboard (pooled) |
-| `DIRECT_URL` | ✅ | Vercel Postgres dashboard (unpooled) |
+| `DATABASE_URL` | Phase 0 | Vercel Postgres dashboard (pooled) |
+| `DIRECT_URL` | Phase 0 | Vercel Postgres dashboard (unpooled) |
 | `NEXTAUTH_URL` | Phase 1 | Your deploy URL (e.g. `https://momdaily.vercel.app`) |
 | `NEXTAUTH_SECRET` | Phase 1 | `openssl rand -base64 32` |
 | `RESEND_API_KEY` | Phase 4 | resend.com dashboard |
-| `EMAIL_FROM` | Phase 4 | Your verified sender |
+| `EMAIL_FROM` | Phase 4 | `MomDaily <hello@yourverifieddomain.com>` |
+| `CRON_SECRET` | Phase 4 | `openssl rand -base64 32` |
+| `APP_ORIGIN` | Phase 4 (optional) | Override for `NEXTAUTH_URL` if you want cron to hit a preview |
 | `ANTHROPIC_API_KEY` | Phase 8 | console.anthropic.com |
 
-## Email domain DNS (Phase 4 prep — note now)
+## Email setup (Phase 4)
 
-When you add Resend in Phase 4, you'll need:
-- SPF record (TXT) on your sending domain
-- DKIM record (TXT) from Resend dashboard
-- DMARC record (TXT, start with `p=none` for monitoring)
+### 1. Resend account + domain
 
-Add these to your DNS provider before going live, even if it's a few weeks out — propagation can take 24h.
+- Create a Resend account, add your sending domain (e.g. `momdaily.app`).
+- Resend dashboard will give you three DNS records to add — set them on your domain registrar:
+  - **SPF** (TXT): `v=spf1 include:amazonses.com ~all` (Resend uses SES under the hood)
+  - **DKIM** (TXT): the long string Resend hands you, under `resend._domainkey.yourdomain.com`
+  - **DMARC** (TXT): start with `v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.com` for monitoring; tighten to `p=quarantine` later.
+- DNS propagation can take 24 hours. Resend verifies once records are live.
+- Until verification, sends will work from the default `onboarding@resend.dev` address — fine for development, never for real users (deliverability is bad and the from address looks sketchy).
+
+### 2. Cron
+
+- Cron schedule lives in `vercel.json` — currently `0 * * * *` (hourly on the hour).
+- **Vercel Hobby plan caveat:** Hobby allows daily crons only — hourly requires the Pro plan. Three workarounds if you're staying Hobby:
+  1. Drop to daily, accept that every user gets the email at the same UTC moment regardless of their timezone (bad for retention but fine for initial testing).
+  2. Use a free external scheduler (GitHub Actions hourly workflow, EasyCron, or cron-job.org) to hit `/api/cron/send-morning-emails` with `Authorization: Bearer $CRON_SECRET`. This is what I'd do.
+  3. Upgrade to Vercel Pro ($20/mo).
+- Either way, set `CRON_SECRET` in Vercel env so manual triggers (and external schedulers) work.
+- After deploy, smoke-test the endpoint from your laptop:
+  ```bash
+  curl -i https://your-deploy.vercel.app/api/cron/send-morning-emails \
+    -H "Authorization: Bearer $CRON_SECRET"
+  ```
+  You should get a 200 with a JSON summary (`candidates`, `sent`, `skipped`, `failed`).
+
+### 3. Sender warm-up
+
+Don't blast 1,000 cold emails on day one — Gmail and Outlook will throttle a brand-new sending domain. Ramp gradually:
+- Days 1–3: <50 sends/day
+- Week 1: <200/day
+- Week 2: <500/day
+- Past 2 weeks: scale freely
+
+This is standard practice for any transactional sender.
 
 ## Phase 0 Done Gate
 
@@ -70,4 +100,13 @@ Add these to your DNS provider before going live, even if it's a few weeks out �
 - [ ] Deploy on `main` is green
 - [ ] Production URL loads the placeholder home
 
-When all six are checked, Phase 0 is complete and you can start Phase 1.
+## Phase 4 Done Gate
+
+- [ ] Resend account + verified sending domain
+- [ ] SPF, DKIM, DMARC DNS records live
+- [ ] `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET` set in Vercel env
+- [ ] `vercel.json` cron registered (visible in Vercel dashboard → Cron Jobs)
+- [ ] Manual `curl` to the cron endpoint returns a 200 with summary JSON
+- [ ] A real beta user receives the morning email at their local send hour
+- [ ] Tapping a habit button in the email lands on `/dashboard?logged=ok` and shows the toast
+- [ ] HabitLog row exists in DB for that user/habit/today
