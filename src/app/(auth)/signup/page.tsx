@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -55,6 +56,19 @@ export default function SignupPage() {
         <p className="mt-2 text-[var(--fg-muted)] text-sm">
           Two minutes to set up. We&apos;ll ask about your child next.
         </p>
+      </div>
+
+      <div className="mb-4">
+        <GoogleSignInButton label="Sign up with Google" />
+      </div>
+
+      <div
+        className="flex items-center gap-3 mb-4 text-xs text-[var(--fg-muted)]"
+        aria-hidden="true"
+      >
+        <span className="flex-1 h-px bg-[var(--border)]" />
+        <span>or with email</span>
+        <span className="flex-1 h-px bg-[var(--border)]" />
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">

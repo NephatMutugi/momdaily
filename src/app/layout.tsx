@@ -3,6 +3,7 @@ import "./globals.css";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 import BottomNavGate from "@/components/BottomNavGate";
 import AppShell from "@/components/AppShell";
+import AppHeader from "@/components/AppHeader";
 
 export const metadata: Metadata = {
   title: "MomDaily",
@@ -30,6 +31,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <SessionProviderWrapper>
+          <AppHeader />
           <AppShell>{children}</AppShell>
         </SessionProviderWrapper>
         <BottomNavGate />

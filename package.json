@@ -15,7 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "e2e": "playwright test",
     "e2e:install": "playwright install",
-    "cron:morning": "tsx scripts/run-morning-cron.ts",
+    "cron:morning": "tsx --env-file=.env scripts/run-morning-cron.ts",
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && next build"
   },

@@ -1,16 +1,12 @@
 "use client";
 
 /**
- * Conditionally renders the BottomNav.
- *
- * Hidden on:
- *   - Landing page                 (/)
- *   - Auth flows                   (/login, /signup, /onboarding)
- *   - Offline fallback             (/offline) — added in Phase 6
- *
- * Kept in sync with AppShell's HIDDEN_PATTERNS so chrome behaves consistently.
+ * Conditionally renders the BottomNav. Hidden on landing, auth, onboarding,
+ * and offline. BottomNav uses useSearchParams (to distinguish Tips from
+ * Saved), so it's wrapped in <Suspense> per Next.js 15 requirements.
  */
 
+import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "./BottomNav";
 
@@ -26,5 +22,9 @@ export default function BottomNavGate() {
   const pathname = usePathname() ?? "/";
   const hidden = HIDDEN_PATTERNS.some((re) => re.test(pathname));
   if (hidden) return null;
-  return <BottomNav />;
+  return (
+    <Suspense fallback={null}>
+      <BottomNav />
+    </Suspense>
+  );
 }

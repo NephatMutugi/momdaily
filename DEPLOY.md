@@ -47,11 +47,64 @@ Once the schema settles (later phases), switch to `prisma migrate deploy` in the
 | `DIRECT_URL` | Phase 0 | Vercel Postgres dashboard (unpooled) |
 | `NEXTAUTH_URL` | Phase 1 | Your deploy URL (e.g. `https://momdaily.vercel.app`) |
 | `NEXTAUTH_SECRET` | Phase 1 | `openssl rand -base64 32` |
+| `GOOGLE_CLIENT_ID` | Optional | console.cloud.google.com (see "Google sign-in" section) |
+| `GOOGLE_CLIENT_SECRET` | Optional | console.cloud.google.com |
 | `RESEND_API_KEY` | Phase 4 | resend.com dashboard |
 | `EMAIL_FROM` | Phase 4 | `MomDaily <hello@yourverifieddomain.com>` |
 | `CRON_SECRET` | Phase 4 | `openssl rand -base64 32` |
 | `APP_ORIGIN` | Phase 4 (optional) | Override for `NEXTAUTH_URL` if you want cron to hit a preview |
 | `ANTHROPIC_API_KEY` | Phase 8 | console.anthropic.com |
+
+## Google sign-in (optional)
+
+NextAuth supports Google OAuth out of the box. The button on /signup and
+/login automatically hides if `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+aren't set, so this is fully optional.
+
+### One-time Google Cloud Console setup
+
+1. Open https://console.cloud.google.com — sign in, create or pick a project.
+2. **APIs & Services → OAuth consent screen** → choose **External**:
+   - App name: `MomDaily`
+   - User support email + developer contact: your email
+   - Save. Default scopes are fine.
+3. **APIs & Services → Credentials → + Create credentials → OAuth client ID**:
+   - Application type: **Web application**
+   - Name: `momdaily-web`
+   - **Authorized JavaScript origins**:
+     - `http://localhost:3000`
+     - `https://your-deploy.vercel.app`
+   - **Authorized redirect URIs**:
+     - `http://localhost:3000/api/auth/callback/google`
+     - `https://your-deploy.vercel.app/api/auth/callback/google`
+4. Copy the **Client ID** and **Client secret** that appear in the dialog.
+   The secret is shown once.
+
+### Env vars to set (locally and in Vercel)
+
+```
+GOOGLE_CLIENT_ID="123...apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="GOCSPX-..."
+```
+
+### Test users while the OAuth screen is unpublished
+
+In **OAuth consent screen → Test users → + Add users**, add the email(s) you
+want to sign in with. Until you click **Publish app** at the top, only test
+users can complete the OAuth flow — everyone else sees a "this app hasn't
+been verified" wall.
+
+When you're ready for real users, **Publishing status → Publish app**. You
+won't need Google's verification review until you request sensitive scopes
+(we only ask for email + profile, which are non-sensitive).
+
+### Account linking note
+
+Our config sets `allowDangerousEmailAccountLinking: true` on Google. That
+means a user who originally signed up with email + password can later sign
+in with Google (same email) and have it merged onto their existing User.
+Google verifies email addresses, so the practical risk is low. If you ever
+add a less-trusted OAuth provider, don't copy this flag onto it.
 
 ## Email setup (Phase 4)
 

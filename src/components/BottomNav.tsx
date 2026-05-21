@@ -1,32 +1,24 @@
 "use client";
 
 /**
- * Primary mobile bottom navigation — mirrors gym-planner's pattern.
+ * Primary mobile bottom navigation — four tabs, thumb-zone aligned.
  *
- * In Phase 0 this component is defined but not yet mounted (no protected
- * routes exist). Phase 3 (dashboard) is where it gets wired into the layout
- * via a BottomNavGate that hides it on landing, auth, and onboarding.
- *
- * iOS PWA notes (for when this gets mounted):
- *   - viewportFit="cover" is set in app/layout.tsx so env(safe-area-inset-*)
- *     resolves to real pixels.
- *   - paddingBottom: env(safe-area-inset-bottom) keeps tap targets above the
+ * Design notes:
+ *   - Research says 3–5 items is the sweet spot. We're at four:
+ *     Today, Tips, Saved, Profile.
+ *   - "Saved" links to /tips?saved=1, which is the same physical page as
+ *     "Tips" but with the bookmark filter pre-applied. The active matcher
+ *     distinguishes the two by reading `saved=1` from the URL.
+ *   - Touch targets are 56×72 — well past WCAG 2.5.5's 44px enhanced bar.
+ *   - iOS PWA: env(safe-area-inset-bottom) keeps tap targets above the
  *     home-indicator gesture region.
  *
  * Desktop: hidden via Tailwind `md:hidden`. SidebarNav takes over on md+.
  */
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-
-export type NavTab = {
-  href: string;
-  label: string;
-  matches: (path: string) => boolean;
-  outline: ReactNode;
-  filled: ReactNode;
-};
 
 const STROKE = "currentColor";
 
@@ -42,7 +34,6 @@ function HomeOutline() {
     </svg>
   );
 }
-
 function HomeFilled() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -69,7 +60,6 @@ function BookOutline() {
     </svg>
   );
 }
-
 function BookFilled() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -79,11 +69,11 @@ function BookFilled() {
   );
 }
 
-function HeartOutline() {
+function BookmarkOutline() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
-        d="M12 20s-7-4.35-7-10a4 4 0 0 1 7-2.65A4 4 0 0 1 19 10c0 5.65-7 10-7 10Z"
+        d="M6 3a2 2 0 0 0-2 2v16l8-4 8 4V5a2 2 0 0 0-2-2H6Z"
         stroke={STROKE}
         strokeWidth="1.75"
         strokeLinejoin="round"
@@ -91,11 +81,10 @@ function HeartOutline() {
     </svg>
   );
 }
-
-function HeartFilled() {
+function BookmarkFilled() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 20s-7-4.35-7-10a4 4 0 0 1 7-2.65A4 4 0 0 1 19 10c0 5.65-7 10-7 10Z" />
+      <path d="M6 3a2 2 0 0 0-2 2v16l8-4 8 4V5a2 2 0 0 0-2-2H6Z" />
     </svg>
   );
 }
@@ -113,7 +102,6 @@ function UserOutline() {
     </svg>
   );
 }
-
 function UserFilled() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -123,6 +111,16 @@ function UserFilled() {
   );
 }
 
+export interface NavTab {
+  href: string;
+  label: string;
+  /** Matches against pathname + search params, returns true if this tab is active. */
+  matches: (path: string, params: URLSearchParams) => boolean;
+  outline: ReactNode;
+  filled: ReactNode;
+}
+
+// `Tips` and `Saved` share the same path; the `saved=1` param disambiguates.
 export const NAV_TABS: NavTab[] = [
   {
     href: "/dashboard",
@@ -134,16 +132,17 @@ export const NAV_TABS: NavTab[] = [
   {
     href: "/tips",
     label: "Tips",
-    matches: (p) => p === "/tips" || p.startsWith("/tips/"),
+    matches: (p, params) =>
+      (p === "/tips" || p.startsWith("/tips/")) && params.get("saved") !== "1",
     outline: <BookOutline />,
     filled: <BookFilled />,
   },
   {
-    href: "/coach",
-    label: "Coach",
-    matches: (p) => p === "/coach" || p.startsWith("/coach/"),
-    outline: <HeartOutline />,
-    filled: <HeartFilled />,
+    href: "/tips?saved=1",
+    label: "Saved",
+    matches: (p, params) => p === "/tips" && params.get("saved") === "1",
+    outline: <BookmarkOutline />,
+    filled: <BookmarkFilled />,
   },
   {
     href: "/account",
@@ -156,6 +155,10 @@ export const NAV_TABS: NavTab[] = [
 
 export default function BottomNav() {
   const pathname = usePathname() ?? "";
+  const sp = useSearchParams();
+  // useSearchParams returns a ReadonlyURLSearchParams; cast to URLSearchParams shape
+  const params = new URLSearchParams(sp?.toString() ?? "");
+
   return (
     <nav
       aria-label="Primary"
@@ -164,9 +167,9 @@ export default function BottomNav() {
     >
       <ul className="mx-auto grid max-w-md grid-cols-4">
         {NAV_TABS.map((tab) => {
-          const active = tab.matches(pathname);
+          const active = tab.matches(pathname, params);
           return (
-            <li key={tab.href}>
+            <li key={tab.label}>
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}

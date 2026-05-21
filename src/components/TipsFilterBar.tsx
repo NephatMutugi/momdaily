@@ -11,7 +11,7 @@
  */
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 const CATEGORIES = [
   { value: "nutrition", label: "Nutrition" },
@@ -45,6 +45,20 @@ export default function TipsFilterBar({
   const activeAge = params.get("age");
   const activeSaved = params.get("saved") === "1";
   const [q, setQ] = useState(params.get("q") ?? "");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // When the user lands here via the header's search icon (?focus=q), pop
+  // focus into the search input so they can start typing immediately.
+  // The focus param is then cleared from the URL so refresh doesn't refocus.
+  useEffect(() => {
+    if (params.get("focus") === "q") {
+      searchRef.current?.focus();
+      const next = new URLSearchParams(params.toString());
+      next.delete("focus");
+      router.replace(`${pathname}${next.toString() ? `?${next}` : ""}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function setParam(key: string, value: string | null) {
     const next = new URLSearchParams(params.toString());
@@ -64,6 +78,7 @@ export default function TipsFilterBar({
     <div className="space-y-3">
       <form onSubmit={onSearchSubmit} className="flex items-center gap-2">
         <input
+          ref={searchRef}
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}

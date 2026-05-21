@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 const REMEMBER_KEY = "md.remember";
 const EMAIL_KEY = "md.lastEmail";
@@ -67,6 +68,19 @@ export default function LoginPage() {
     <main className="mx-auto max-w-md min-h-[100dvh] flex flex-col p-6">
       <div className="pt-10 pb-6">
         <h1 className="text-2xl font-bold">Welcome back</h1>
+      </div>
+
+      <div className="mb-4">
+        <GoogleSignInButton label="Continue with Google" />
+      </div>
+
+      <div
+        className="flex items-center gap-3 mb-4 text-xs text-[var(--fg-muted)]"
+        aria-hidden="true"
+      >
+        <span className="flex-1 h-px bg-[var(--border)]" />
+        <span>or with email</span>
+        <span className="flex-1 h-px bg-[var(--border)]" />
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">

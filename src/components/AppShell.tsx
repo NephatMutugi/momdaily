@@ -1,17 +1,18 @@
 "use client";
 
 /**
- * Wraps every page. On routes where we don't want chrome (landing, auth flows,
- * onboarding, offline fallback) the shell becomes a transparent pass-through.
- * For other routes it will (in Phase 1+) render a sidebar on desktop and
- * coordinate with BottomNav on mobile — same convention as gym-planner.
+ * Wraps every page with the desktop app shell: fixed left sidebar plus a
+ * left-padded content column on md+. On mobile the sidebar is hidden and
+ * the BottomNav handles navigation (the AppHeader handles top-of-screen).
  *
- * In Phase 0 every route is "hidden" since there's only `/`. The structure is
- * here so Phase 1 doesn't need to refactor.
+ * On routes where we don't want chrome (landing, auth flows, onboarding,
+ * offline fallback) the shell becomes a transparent pass-through. Keep
+ * HIDDEN_PATTERNS in sync with BottomNavGate and AppHeader.
  */
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import SidebarNav from "./SidebarNav";
 
 const HIDDEN_PATTERNS: RegExp[] = [
   /^\/$/,
@@ -29,6 +30,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  // Phase 1+ will render <SidebarNav /> here on desktop.
-  return <div className="md:pl-60">{children}</div>;
+  return (
+    <>
+      <SidebarNav />
+      <div className="md:pl-60">{children}</div>
+    </>
+  );
 }
