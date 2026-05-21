@@ -1,10 +1,8 @@
-// MomDaily schema — Phase 0 baseline.
-// Postgres (Vercel Postgres, Neon-backed) for both local dev and production.
+// MomDaily schema — Phase 2.
+// Postgres (Vercel Postgres, Neon-backed).
 //
-// This file currently only contains the NextAuth-required tables plus a
-// minimal User stub so the first migration is non-empty and the Prisma client
-// has something to generate. Phase 1 fills out the User profile, adds Child,
-// and the Goal enum. Phase 2+ adds Tip, Habit, HabitLog, etc.
+// Phase 2 adds: TipCategory enum, Tip, TipShown (no-repeat tracking),
+// TipFeedback. Phase 3 adds Habit/HabitLog. Phase 4 adds EmailPreference.
 
 generator client {
   provider = "prisma-client-js"
@@ -16,7 +14,32 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// --- NextAuth required tables (wired up in Phase 1) ---
+// --- Enums ---
+
+enum Goal {
+  sleep
+  feeding
+  milestones
+  self_care
+}
+
+enum FeedingStage {
+  breast
+  formula
+  mixed
+  solids
+  family_foods
+}
+
+enum TipCategory {
+  nutrition
+  sleep
+  milestones
+  self_care
+  safety
+}
+
+// --- NextAuth required tables ---
 
 model Account {
   id                String  @id @default(cuid())
@@ -53,17 +76,104 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// --- User (minimal stub — Phase 1 expands this) ---
+// --- Domain models ---
 
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
   emailVerified DateTime?
   name          String?
+  passwordHash  String?
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
+  // Profile / preferences
+  timezone  String  @default("UTC")
+  locale    String  @default("en")
+  topGoal   Goal?
+  onboarded Boolean @default(false)
+
+  accounts     Account[]
+  sessions     Session[]
+  children     Child[]
+  tipsShown    TipShown[]
+  tipFeedback  TipFeedback[]
+}
+
+model Child {
+  id           String       @id @default(cuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String?
+  birthdate    DateTime
+  feedingStage FeedingStage
+  gender       String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([userId])
+}
+
+// --- Tip catalog ---
+
+model Tip {
+  id              String      @id @default(cuid())
+  slug            String      @unique
+  title           String
+  // Markdown. Kept short — Phase 5 will render this on a public tip page.
+  body            String
+  category        TipCategory
+  // Inclusive age band, in months.
+  ageMinMonths    Int
+  ageMaxMonths    Int
+  // Which user goals this tip "hits" — used by the selector for goal weighting.
+  goalsHit        Goal[]
+  // Aggregate signal — incremented by TipFeedback writes. Read-mostly.
+  helpfulCount    Int         @default(0)
+  notHelpfulCount Int         @default(0)
+  // Free-form citation strings (URLs or "AAP, 2024"). Rendered on tip page.
+  sources         String[]
+  // null = draft. Selector and public pages only consider published tips.
+  publishedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  shownTo   TipShown[]
+  feedbacks TipFeedback[]
+
+  @@index([publishedAt])
+  @@index([category])
+  @@index([ageMinMonths, ageMaxMonths])
+}
+
+// Records each tip ever shown to a user. The selector queries this to
+// enforce the "no repeats inside 30 days" rule. We update shownAt on every
+// (re)show, so a single row per (user, tip) is enough.
+model TipShown {
+  id      String   @id @default(cuid())
+  userId  String
+  tipId   String
+  shownAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tip  Tip  @relation(fields: [tipId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tipId])
+  @@index([userId, shownAt])
+}
+
+model TipFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  tipId     String
+  helpful   Boolean
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tip  Tip  @relation(fields: [tipId], references: [id], onDelete: Cascade)
+
+  // One vote per user per tip — re-submitting overwrites.
+  @@unique([userId, tipId])
+  @@index([tipId])
 }

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import SessionProviderWrapper from "@/components/SessionProviderWrapper";
+import BottomNavGate from "@/components/BottomNavGate";
 import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
@@ -27,7 +29,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <AppShell>{children}</AppShell>
+        <SessionProviderWrapper>
+          <AppShell>{children}</AppShell>
+        </SessionProviderWrapper>
+        <BottomNavGate />
       </body>
     </html>
   );
