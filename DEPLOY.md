@@ -118,20 +118,47 @@ add a less-trusted OAuth provider, don't copy this flag onto it.
 - DNS propagation can take 24 hours. Resend verifies once records are live.
 - Until verification, sends will work from the default `onboarding@resend.dev` address — fine for development, never for real users (deliverability is bad and the from address looks sketchy).
 
-### 2. Cron
+### 2. Cron — GitHub Actions, not Vercel Cron
 
-- Cron schedule lives in `vercel.json` — currently `0 * * * *` (hourly on the hour).
-- **Vercel Hobby plan caveat:** Hobby allows daily crons only — hourly requires the Pro plan. Three workarounds if you're staying Hobby:
-  1. Drop to daily, accept that every user gets the email at the same UTC moment regardless of their timezone (bad for retention but fine for initial testing).
-  2. Use a free external scheduler (GitHub Actions hourly workflow, EasyCron, or cron-job.org) to hit `/api/cron/send-morning-emails` with `Authorization: Bearer $CRON_SECRET`. This is what I'd do.
-  3. Upgrade to Vercel Pro ($20/mo).
-- Either way, set `CRON_SECRET` in Vercel env so manual triggers (and external schedulers) work.
-- After deploy, smoke-test the endpoint from your laptop:
-  ```bash
-  curl -i https://your-deploy.vercel.app/api/cron/send-morning-emails \
-    -H "Authorization: Bearer $CRON_SECRET"
-  ```
-  You should get a 200 with a JSON summary (`candidates`, `sent`, `skipped`, `failed`).
+We use **GitHub Actions** to schedule the morning email cron, not Vercel Cron.
+Reason: Vercel's Hobby plan only allows daily schedules, and we need hourly
+to serve users across timezones at their local 7 AM. GitHub Actions on the
+free tier allows arbitrary cron schedules.
+
+The workflow lives at `.github/workflows/morning-cron.yml` and fires
+`0 * * * *` (every hour). It POSTs to `/api/cron/send-morning-emails` with
+`Authorization: Bearer $CRON_SECRET`.
+
+### One-time GitHub setup
+
+In the repo settings: **Settings → Secrets and variables → Actions → New repository secret**, add two secrets:
+
+| Secret | Value |
+|---|---|
+| `APP_URL` | Your production URL, e.g. `https://momdaily.vercel.app` (no trailing slash) |
+| `CRON_SECRET` | Same value as the Vercel env var of the same name. Generate with `openssl rand -base64 32`. |
+
+After adding the secrets, run the workflow manually once to verify:
+**Actions tab → Morning email cron → Run workflow → Run**.
+
+You should see a green check within ~30 seconds and a JSON summary in the
+log: `{"candidates":N,"sent":N,"skipped":N,"failed":0,"errors":[]}`.
+
+### Smoke test from your laptop (optional)
+
+```bash
+curl -i https://your-deploy.vercel.app/api/cron/send-morning-emails \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+You should get a 200 with the same JSON summary.
+
+### Timing notes
+
+GitHub Actions cron isn't strictly punctual — runs can be delayed by up to
+~15 minutes under load. Fine for a morning email; the endpoint is idempotent
+(see `EmailSendLog` schema) so a delayed run still only sends once per
+user per day.
 
 ### 3. Sender warm-up
 
@@ -158,7 +185,8 @@ This is standard practice for any transactional sender.
 - [ ] Resend account + verified sending domain
 - [ ] SPF, DKIM, DMARC DNS records live
 - [ ] `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET` set in Vercel env
-- [ ] `vercel.json` cron registered (visible in Vercel dashboard → Cron Jobs)
+- [ ] `APP_URL` + `CRON_SECRET` set as GitHub Actions repo secrets
+- [ ] GitHub Actions workflow shows green on manual "Run workflow"
 - [ ] Manual `curl` to the cron endpoint returns a 200 with summary JSON
 - [ ] A real beta user receives the morning email at their local send hour
 - [ ] Tapping a habit button in the email lands on `/dashboard?logged=ok` and shows the toast

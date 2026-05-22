@@ -1,0 +1,58 @@
+# Morning email cron — fires the /api/cron/send-morning-emails endpoint
+# every hour on the hour (UTC). The endpoint internally checks each user's
+# stored timezone and only emails users whose local hour matches their
+# preference, so the per-timezone delivery still works correctly.
+#
+# Why this lives in GitHub Actions instead of Vercel Cron:
+#   Vercel's Hobby plan only allows daily schedules. We need hourly
+#   to serve users across timezones. GitHub Actions on the free tier
+#   allows arbitrary cron schedules at no cost.
+#
+# Required GitHub secrets (Settings → Secrets and variables → Actions):
+#   APP_URL       e.g. https://momdaily.vercel.app
+#   CRON_SECRET   same value as the Vercel env var of the same name
+#
+# Note on timing: GitHub Actions cron isn't strictly punctual — runs can be
+# delayed by up to ~15 minutes under load. For a morning email that's fine;
+# the endpoint is idempotent so a delayed run still only sends once.
+#
+# Manual run: Actions tab → "Morning email cron" → Run workflow.
+
+name: Morning email cron
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    name: Hit cron endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST to /api/cron/send-morning-emails
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "::error::APP_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET secret is not set"
+            exit 1
+          fi
+          echo "Calling $APP_URL/api/cron/send-morning-emails"
+          response=$(curl --fail-with-body -sS -X GET \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Accept: application/json" \
+            -w "\nHTTP_STATUS:%{http_code}" \
+            "$APP_URL/api/cron/send-morning-emails")
+          echo "$response"
+          status=$(echo "$response" | tail -n1 | sed 's/HTTP_STATUS://')
+          if [ "$status" != "200" ]; then
+            echo "::error::Non-200 response from cron endpoint: $status"
+            exit 1
+          fi
