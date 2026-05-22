@@ -105,13 +105,6 @@ export async function POST(req: NextRequest) {
           update: {},
         });
       }
-      // Seed default email preferences. Morning ON, evening OFF, weekly ON.
-      // sendHourLocal defaults to 7am; user can change later in /account.
-      await tx.emailPreference.upsert({
-        where: { userId: session.user.id },
-        create: { userId: session.user.id },
-        update: {},
-      });
     });
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {

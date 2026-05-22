@@ -1,18 +1,11 @@
 "use client";
 
 /**
- * Profile page UI. Read-only for now (Phase 4) — edit affordances land in
- * Phase 4.5. Layout mirrors the rest of the app's mobile-first feel.
+ * Profile page UI. Read-only for now — edit affordances land in a later
+ * update. Layout mirrors the rest of the app's mobile-first feel.
  */
 
 import { signOut } from "next-auth/react";
-
-export interface EmailPrefsView {
-  morning: boolean;
-  evening: boolean;
-  weekly: boolean;
-  sendHourLocal: number;
-}
 
 export interface AccountClientProps {
   name: string | null;
@@ -22,7 +15,6 @@ export interface AccountClientProps {
   childName: string | null;
   childAgeMonths: number | null;
   childFeedingStage: string | null;
-  emailPrefs: EmailPrefsView | null;
 }
 
 function ageLabel(m: number | null): string {
@@ -35,13 +27,6 @@ function ageLabel(m: number | null): string {
   return `${y}y ${rest}m`;
 }
 
-function hourLabel(h: number): string {
-  if (h === 0) return "12:00 AM";
-  if (h < 12) return `${h}:00 AM`;
-  if (h === 12) return "12:00 PM";
-  return `${h - 12}:00 PM`;
-}
-
 export default function AccountClient({
   name,
   email,
@@ -50,7 +35,6 @@ export default function AccountClient({
   childName,
   childAgeMonths,
   childFeedingStage,
-  emailPrefs,
 }: AccountClientProps) {
   return (
     <main className="mx-auto max-w-md p-6 pb-32 space-y-6">
@@ -84,42 +68,6 @@ export default function AccountClient({
           label="Feeding stage"
           value={childFeedingStage?.replace("_", " ") ?? "—"}
         />
-      </section>
-
-      <section className="card space-y-3" aria-labelledby="acct-email">
-        <h2
-          id="acct-email"
-          className="text-xs uppercase tracking-wide text-[var(--fg-muted)]"
-        >
-          Email
-        </h2>
-        {emailPrefs ? (
-          <>
-            <Row
-              label="Morning tip"
-              value={emailPrefs.morning ? "On" : "Off"}
-            />
-            <Row
-              label="Evening check-in"
-              value={emailPrefs.evening ? "On" : "Off"}
-            />
-            <Row
-              label="Sunday recap"
-              value={emailPrefs.weekly ? "On" : "Off"}
-            />
-            <Row
-              label="Send time"
-              value={`${hourLabel(emailPrefs.sendHourLocal)} (local)`}
-            />
-          </>
-        ) : (
-          <p className="text-sm text-[var(--fg-muted)]">
-            Email preferences haven&apos;t been set yet.
-          </p>
-        )}
-        <p className="text-xs text-[var(--fg-muted)]">
-          Editing email preferences lands in the next update.
-        </p>
       </section>
 
       <div className="pt-2">

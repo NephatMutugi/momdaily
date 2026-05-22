@@ -7,14 +7,13 @@
  * changes from inside the page (when the user toggles a habit).
  */
 
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import TipCard, { type TipCardData } from "@/components/TipCard";
 import HabitChecklist, {
   type HabitItem,
   type StreakSnapshot,
 } from "@/components/HabitChecklist";
 import StreakBadge from "@/components/StreakBadge";
-import LoggedToast from "@/components/LoggedToast";
 import ForYouRail from "@/components/ForYouRail";
 import type { TipListItemData } from "@/components/TipListItem";
 
@@ -44,9 +43,6 @@ export default function DashboardClient({
 
   return (
     <main className="mx-auto max-w-md p-6 pb-32 space-y-6">
-      <Suspense fallback={null}>
-        <LoggedToast />
-      </Suspense>
       <header className="pt-4 space-y-2">
         <p className="text-sm text-[var(--fg-muted)]">Good morning,</p>
         <h1 className="text-2xl font-bold">{greetingName}</h1>

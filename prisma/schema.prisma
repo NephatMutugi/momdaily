@@ -1,9 +1,8 @@
-// MomDaily schema — Phase 4.
+// MomDaily schema.
 // Postgres (Vercel Postgres, Neon-backed).
 //
-// Phase 4 adds: EmailPreference (per-user opt-ins + send hour) and
-// EmailSendLog (idempotency: one row per user/kind/day prevents the cron
-// from double-sending if it retries or runs concurrently).
+// The morning-email pipeline (EmailPreference / EmailSendLog / EmailKind)
+// was removed — see git history if it needs to come back.
 
 generator client {
   provider = "prisma-client-js"
@@ -38,12 +37,6 @@ enum TipCategory {
   milestones
   self_care
   safety
-}
-
-enum EmailKind {
-  morning
-  evening
-  weekly_recap
 }
 
 // --- NextAuth required tables ---
@@ -101,16 +94,14 @@ model User {
   topGoal   Goal?
   onboarded Boolean @default(false)
 
-  accounts         Account[]
-  sessions         Session[]
-  children         Child[]
-  tipsShown        TipShown[]
-  tipFeedback      TipFeedback[]
-  tipSaves         TipSave[]
-  habits           Habit[]
-  habitLogs        HabitLog[]
-  emailPreference  EmailPreference?
-  emailSendLogs    EmailSendLog[]
+  accounts    Account[]
+  sessions    Session[]
+  children    Child[]
+  tipsShown   TipShown[]
+  tipFeedback TipFeedback[]
+  tipSaves    TipSave[]
+  habits      Habit[]
+  habitLogs   HabitLog[]
 }
 
 model Child {
@@ -237,41 +228,3 @@ model HabitLog {
   @@index([userId, loggedDate])
 }
 
-// --- Email (Phase 4) ---
-
-// One row per user. Created lazily on first need (onboarding completion or
-// the first cron pass). Send time is stored in the user's local clock — the
-// cron resolves it against User.timezone at send time.
-model EmailPreference {
-  id              String  @id @default(cuid())
-  userId          String  @unique
-  morningEnabled  Boolean @default(true)
-  eveningEnabled  Boolean @default(false)
-  weeklyEnabled   Boolean @default(true)
-  // Hour 0–23 in the user's local timezone. Default 7am.
-  sendHourLocal   Int     @default(7)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// Idempotency guard for the cron. Before sending, the cron upserts a row
-// here keyed by (userId, kind, sentDate). If the row already existed, the
-// cron skips the send — so a retry, concurrent invocation, or accidental
-// re-trigger can't double-mail anyone.
-model EmailSendLog {
-  id        String    @id @default(cuid())
-  userId    String
-  kind      EmailKind
-  // The user's local date the email was sent for, normalized to UTC midnight.
-  sentDate  DateTime  @db.Date
-  // Resend's message id, captured for debugging deliverability issues.
-  providerMessageId String?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, kind, sentDate])
-  @@index([userId, kind])
-}

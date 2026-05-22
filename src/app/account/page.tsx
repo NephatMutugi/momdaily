@@ -7,12 +7,11 @@ import AccountClient from "./AccountClient";
 /**
  * /account — minimal Profile page.
  *
- * Phase 4 lives here as the link target for the Profile tab in BottomNav
- * and SidebarNav. Shows: name, email, child summary, top goal, email prefs
- * (read-only for now), sign-out.
+ * Link target for the Profile tab in BottomNav and SidebarNav. Shows: name,
+ * email, child summary, top goal, sign-out.
  *
- * Phase 4.5+ will add: edit child profile, change top goal, toggle email
- * preferences, change password, delete account.
+ * Later updates will add: edit child profile, change top goal, change
+ * password, delete account.
  */
 
 export const dynamic = "force-dynamic";
@@ -30,14 +29,6 @@ export default async function AccountPage() {
       timezone: true,
       onboarded: true,
       createdAt: true,
-      emailPreference: {
-        select: {
-          morningEnabled: true,
-          eveningEnabled: true,
-          weeklyEnabled: true,
-          sendHourLocal: true,
-        },
-      },
       children: {
         select: { name: true, birthdate: true, feedingStage: true },
         orderBy: { createdAt: "asc" },
@@ -60,16 +51,6 @@ export default async function AccountPage() {
       childName={child?.name ?? null}
       childAgeMonths={child ? monthsBetween(child.birthdate, new Date()) : null}
       childFeedingStage={child?.feedingStage ?? null}
-      emailPrefs={
-        user.emailPreference
-          ? {
-              morning: user.emailPreference.morningEnabled,
-              evening: user.emailPreference.eveningEnabled,
-              weekly: user.emailPreference.weeklyEnabled,
-              sendHourLocal: user.emailPreference.sendHourLocal,
-            }
-          : null
-      }
     />
   );
 }
