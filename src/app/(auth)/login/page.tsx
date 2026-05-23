@@ -1,13 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 const REMEMBER_KEY = "md.remember";
 const EMAIL_KEY = "md.lastEmail";
+
+function ResetSuccessBanner() {
+  // Tiny banner shown after a successful password reset. Lives in its own
+  // component so useSearchParams stays inside <Suspense>.
+  const params = useSearchParams();
+  if (params.get("reset") !== "ok") return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="rounded-xl px-4 py-3 text-sm mb-4"
+      style={{
+        background: "var(--accent-soft)",
+        color: "var(--accent)",
+        border: "1px solid var(--accent)",
+      }}
+    >
+      Password updated. Log in with your new password.
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -69,6 +90,10 @@ export default function LoginPage() {
       <div className="pt-10 pb-6">
         <h1 className="text-2xl font-bold">Welcome back</h1>
       </div>
+
+      <Suspense fallback={null}>
+        <ResetSuccessBanner />
+      </Suspense>
 
       <div className="mb-4">
         <GoogleSignInButton label="Continue with Google" />
@@ -154,16 +179,24 @@ export default function LoginPage() {
           </div>
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-[var(--fg-muted)] select-none cursor-pointer">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
-            className="w-4 h-4"
-            style={{ accentColor: "var(--accent)" }}
-          />
-          <span>Remember me</span>
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-sm text-[var(--fg-muted)] select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="w-4 h-4"
+              style={{ accentColor: "var(--accent)" }}
+            />
+            <span>Remember me</span>
+          </label>
+          <Link
+            href="/forgot-password"
+            className="text-sm text-[var(--fg-muted)] underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
 
         {error && (
           <p className="text-sm" style={{ color: "var(--danger)" }}>

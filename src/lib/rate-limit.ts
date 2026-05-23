@@ -67,3 +67,26 @@ export const COACH_LIMIT: LimiterConfig = {
   capacity: 5,
   refillPerSecond: 5 / 86400,
 };
+
+// Forgot-password limiter. Two keys per request:
+//   - by IP: 5-burst, refill 1/min (prevents spam from one IP)
+//   - by email: 3-burst, refill 1/15min (prevents flooding a real user's
+//     inbox even if the attacker rotates IPs)
+// Both keys are checked; if either is exhausted the request still returns
+// 200 (privacy) but doesn't send.
+export const FORGOT_PASSWORD_IP_LIMIT: LimiterConfig = {
+  capacity: 5,
+  refillPerSecond: 1 / 60,
+};
+export const FORGOT_PASSWORD_EMAIL_LIMIT: LimiterConfig = {
+  capacity: 3,
+  refillPerSecond: 1 / 900,
+};
+
+// Reset-password limiter. Tight — token-guessing should be infeasible at
+// 256 bits of entropy, but rate-limit anyway so a leaked token isn't
+// brute-forced via a typo. Keyed by IP.
+export const RESET_PASSWORD_LIMIT: LimiterConfig = {
+  capacity: 10,
+  refillPerSecond: 1 / 30,
+};

@@ -84,6 +84,10 @@ model User {
   emailVerified DateTime?
   name          String?
   passwordHash  String?
+  // Bumped any time passwordHash is changed (signup, reset, future
+  // /account/security page). Audit trail today; can be wired into JWT
+  // invalidation later if we move off JWT session strategy.
+  passwordChangedAt DateTime?
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -94,14 +98,15 @@ model User {
   topGoal   Goal?
   onboarded Boolean @default(false)
 
-  accounts    Account[]
-  sessions    Session[]
-  children    Child[]
-  tipsShown   TipShown[]
-  tipFeedback TipFeedback[]
-  tipSaves    TipSave[]
-  habits      Habit[]
-  habitLogs   HabitLog[]
+  accounts            Account[]
+  sessions            Session[]
+  children            Child[]
+  tipsShown           TipShown[]
+  tipFeedback         TipFeedback[]
+  tipSaves            TipSave[]
+  habits              Habit[]
+  habitLogs           HabitLog[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Child {
@@ -226,5 +231,32 @@ model HabitLog {
   // One row per habit per day. Re-toggling updates `value` instead of stacking.
   @@unique([userId, habitId, loggedDate])
   @@index([userId, loggedDate])
+}
+
+// --- Password reset ---
+
+// Reset flow: user requests reset → we generate a 256-bit random token, hash
+// it with sha256, store the hash here, and email the plaintext token in a URL.
+// We never store plaintext. On submit, we re-hash the incoming token, look it
+// up by hash (unique index → constant-time equality via the DB), validate
+// expiry + usedAt, and only then accept the new password.
+//
+// We store the HASH (not plaintext) so a DB leak doesn't enable account
+// takeover — same reasoning as bcrypt for passwords.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  // sha256 hex digest of the plaintext token. 64 chars.
+  tokenHash String    @unique
+  expiresAt DateTime
+  // Set on successful reset. Single-use enforcement: usedAt != null → reject.
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // For "show me this user's recent reset requests" admin queries and
+  // for pruning old tokens periodically.
+  @@index([userId, createdAt])
 }
 

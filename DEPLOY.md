@@ -49,6 +49,8 @@ Once the schema settles (later phases), switch to `prisma migrate deploy` in the
 | `NEXTAUTH_SECRET` | Phase 1 | `openssl rand -base64 32` |
 | `GOOGLE_CLIENT_ID` | Optional | console.cloud.google.com (see "Google sign-in" section) |
 | `GOOGLE_CLIENT_SECRET` | Optional | console.cloud.google.com |
+| `RESEND_API_KEY` | Password reset | resend.com dashboard (see "Password reset email" section) |
+| `EMAIL_FROM` | Password reset | `MomDaily <hello@yourverifieddomain.com>` |
 | `ANTHROPIC_API_KEY` | Phase 8 | console.anthropic.com |
 
 ## Google sign-in (optional)
@@ -101,6 +103,47 @@ means a user who originally signed up with email + password can later sign
 in with Google (same email) and have it merged onto their existing User.
 Google verifies email addresses, so the practical risk is low. If you ever
 add a less-trusted OAuth provider, don't copy this flag onto it.
+
+## Password reset email
+
+The `/forgot-password` flow sends a one-time reset link via Resend. Without
+`RESEND_API_KEY` set, the endpoint still returns 200 (so attackers can't
+enumerate accounts), but no email goes out — credentials users would be
+stuck. So if you keep the email/password sign-in path enabled in
+production, set this up.
+
+### 1. Resend account + sending domain
+
+- Create a Resend account, add your sending domain (e.g. `momdaily.app`).
+- Resend will give you three DNS records — set them on your domain registrar:
+  - **SPF** (TXT): `v=spf1 include:amazonses.com ~all`
+  - **DKIM** (TXT): the long string Resend hands you, under `resend._domainkey.yourdomain.com`
+  - **DMARC** (TXT): start with `v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.com`; tighten to `p=quarantine` later.
+- DNS propagation can take up to 24 hours. Resend verifies once records are live.
+- Until verification, you can still send from `onboarding@resend.dev` — fine for
+  development. Don't ship that to real users (deliverability is poor and the
+  from-address looks sketchy).
+
+### 2. Env vars (set in Vercel and locally)
+
+```
+RESEND_API_KEY="re_..."
+EMAIL_FROM="MomDaily <hello@momdaily.app>"   # must be on the verified domain in production
+```
+
+### 3. Smoke test (after deploy)
+
+1. Visit `https://your-deploy.vercel.app/forgot-password`
+2. Submit your own email
+3. Inbox should contain the reset email within ~10 seconds
+4. Tap the button → /reset-password page loads
+5. Choose a new password → redirected to `/login?reset=ok` with the toast
+6. Log in with the new password successfully
+
+If the email never arrives:
+- Resend dashboard → "Emails" tab shows every attempted send and the failure reason
+- DNS records can be verified at https://mxtoolbox.com/SuperTool.aspx
+- Always check spam, especially before your domain has any sending reputation
 
 ## Phase 0 Done Gate
 
